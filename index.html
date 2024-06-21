@@ -28,7 +28,7 @@
             padding: 0.5rem;
             margin-bottom: 1rem;
         }
-        input[type="submit"] {
+        button {
             background-color: #4CAF50;
             color: white;
             padding: 0.5rem 1rem;
@@ -45,13 +45,32 @@
     <div class="container">
         <h1>Number Guessing Game</h1>
         <p>Guess a number between 1 and 100:</p>
-        <form method="post">
-            <input type="number" name="guess" min="1" max="100" required>
-            <input type="submit" value="Submit Guess">
-        </form>
-        {{if .Message}}
-        <p class="message">{{.Message}}</p>
-        {{end}}
+        <input type="number" id="guessInput" min="1" max="100" required>
+        <button onclick="checkGuess()">Submit Guess</button>
+        <p id="message" class="message"></p>
     </div>
+
+    <script>
+        let targetNumber = Math.floor(Math.random() * 100) + 1;
+        let messageElement = document.getElementById('message');
+
+        function checkGuess() {
+            let guess = parseInt(document.getElementById('guessInput').value);
+            
+            if (isNaN(guess) || guess < 1 || guess > 100) {
+                messageElement.textContent = "Please enter a valid number between 1 and 100.";
+                return;
+            }
+
+            if (guess < targetNumber) {
+                messageElement.textContent = "Too low! Try again.";
+            } else if (guess > targetNumber) {
+                messageElement.textContent = "Too high! Try again.";
+            } else {
+                messageElement.textContent = `Congratulations! You guessed the number ${targetNumber} correctly!`;
+                targetNumber = Math.floor(Math.random() * 100) + 1;
+            }
+        }
+    </script>
 </body>
 </html>
