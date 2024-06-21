@@ -15,30 +15,34 @@ func main() {
 	targetNumber = rand.Intn(100) + 1
 	tmpl = template.Must(template.ParseFiles("game.html"))
 
-	http.HandleFunc("/", handleGuess)
+	http.HandleFunc("/", handleGame)
 	fmt.Println("Server is running on http://localhost:8080")
 	http.ListenAndServe(":8080", nil)
 }
 
-func handleGuess(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+func handleGame(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
 		tmpl.Execute(w, nil)
-		return
+	case http.MethodPost:
+		guess, _ := strconv.Atoi(r.FormValue("guess"))
+		message := checkGuess(guess)
+		tmpl.Execute(w, struct {
+			Message string
+		}{Message: message})
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
+}
 
-	guess, _ := strconv.Atoi(r.FormValue("guess"))
-	var message string
-
+func checkGuess(guess int) string {
 	if guess < targetNumber {
-		message = "Too low! Try again."
+		return "Too low! Try again."
 	} else if guess > targetNumber {
-		message = "Too high! Try again."
+		return "Too high! Try again."
 	} else {
-		message = "Congratulations! You guessed it!"
+		oldTarget := targetNumber
 		targetNumber = rand.Intn(100) + 1
+		return fmt.Sprintf("Congratulations! You guessed %d correctly! A new number has been chosen.", oldTarget)
 	}
-
-	tmpl.Execute(w, struct {
-		Message string
-	}{Message: message})
 }
