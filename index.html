@@ -1,10 +1,10 @@
+--- START OF FILE doom-man-game.html ---
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>T-Rex Chicken Shooter</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.55.2/phaser.min.js"></script>
+    <title>DoomMan - 8-bit Doom Sidescroller</title>
     <style>
         body {
             margin: 0;
@@ -14,10 +14,1273 @@
             align-items: center;
             height: 100vh;
             background-color: #000;
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+        }
+
+        #game-canvas {
+            border: 4px solid #8B0000;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            color: #8B0000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        #start-screen h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 0 #FF0000;
+        }
+
+        #start-screen p {
+            font-size: 24px;
+            margin: 10px 0;
+            text-align: center; /* Center align the controls */
+        }
+
+        #start-screen button {
+            margin-top: 30px;
+            padding: 10px 20px;
+            font-size: 24px;
+            background-color: #8B0000;
+            color: #FFF;
+            border: none;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+
+        #start-screen button:hover {
+            background-color: #FF0000;
+        }
+
+        #ui-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 5;
+            color: #FFFFFF;
+            font-size: 16px;
+        }
+
+        #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #FF0000;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        #game-over h2 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        #game-over button {
+            margin-top: 30px;
+            padding: 10px 20px;
+            font-size: 24px;
+            background-color: #8B0000;
+            color: #FFF;
+            border: none;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+
+        #win-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #00FF00; /* Green for win */
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 11; /* Higher z-index than game over */
+        }
+
+        #win-screen h2 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        #win-screen button {
+            margin-top: 30px;
+            padding: 10px 20px;
+            font-size: 24px;
+            background-color: #00FF00; /* Green button for win */
+            color: #000; /* Black text for contrast */
+            border: none;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+         #win-screen button:hover {
+            background-color: #00BB00; /* Darker green on hover */
+        }
+
+        #control-disclaimer {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #555; /* Subtle grey color */
+            font-size: 14px;
+            opacity: 0.7; /* Initial opacity */
+            animation: breathe 5s infinite alternate; /* Breathing animation */
+            z-index: 6; /* Above UI overlay but below start/game over screens */
+            text-align: center;
+            white-space: nowrap; /* Ensure single line */
+        }
+
+        @keyframes breathe {
+            0% { opacity: 0.5; }
+            100% { opacity: 0.9; }
         }
     </style>
 </head>
 <body>
-    <script src="game.js"></script>
+    <div id="game-container">
+        <div id="control-disclaimer">
+            CONTROLS: SPACE to Jump, A/D to Move, SHIFT to Shoot
+        </div>
+        <canvas id="game-canvas" width="800" height="600"></canvas>
+        <div id="ui-overlay">
+            <div>HEALTH: <span id="health-display">100</span></div>
+            <div>AMMO: <span id="ammo-display">50</span></div>
+            <div>SCORE: <span id="score-display">0</span></div>
+        </div>
+        <div id="start-screen">
+            <h1>DOOM MAN</h1>
+            <p>
+                SPACE to Jump<br>
+                A/D to Move<br>
+                SHIFT to Shoot
+            </p>
+            <button id="start-button">START GAME</button>
+        </div>
+        <div id="game-over">
+            <h2>GAME OVER</h2>
+            <button id="restart-button">RESTART</button>
+        </div>
+        <div id="win-screen">
+            <h2>YOU WIN!</h2>
+            <button id="win-restart-button">RESTART</button>
+        </div>
+    </div>
+
+    <script>
+        // Game constants
+        const GRAVITY = 0.5;
+        const JUMP_FORCE = -12;
+        const PLAYER_SPEED = 5 / 2; // Slowed down 50%
+        const ENEMY_SPEED = (2 / 2) * 0.75;  // Slowed down 50% then 25% more = 62.5% speed
+        const BULLET_SPEED = 10 / 2; // Slowed down 50%
+        const TILE_SIZE = 32;
+
+        // Game state
+        let gameRunning = false;
+        let playerHealth = 100;
+        let playerAmmo = 50;
+        let score = 0;
+        let ammoDropInterval; // Variable to hold the ammo drop interval
+
+        // Game objects
+        const player = {
+            x: 100,
+            y: 300,
+            width: 32,
+            height: 48,
+            velocityX: 0,
+            velocityY: 0,
+            isJumping: false,
+            direction: 1, // 1 for right, -1 for left
+            shootCooldown: 0,
+            invulnerable: 0,
+            color: '#008000', // Doom green as default, overridden in render
+            jumpCooldownTimer: 0 // New jump cooldown timer
+        };
+
+        const bullets = [];
+        const enemies = [];
+        const platforms = [];
+        const pickups = [];
+        const fallingPickups = []; // Array for pickups falling from sky
+
+        // Canvas setup
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Sprite images (simulated with colored rectangles for 8-bit feel)
+        const sprites = {
+            player: {
+                width: 32,
+                height: 48,
+                idle: [], // Animation frames will be procedurally generated
+                run: [],
+                jump: [],
+                duck: [], // Duck removed
+                shoot: []
+            },
+            enemy: {
+                imp: { width: 32, height: 40, frames: [] },
+                demon: { width: 48, height: 48, frames: [] },
+                cyberdemon: { width: 96, height: 96, frames: [] } // Cyberdemon sprite definition
+            },
+            bullet: { width: 16, height: 8 },
+            platform: { width: 32, height: 32 },
+            pickup: {
+                health: { width: 24, height: 24 },
+                ammo: { width: 24, height: 24 }
+            }
+        };
+
+        // Level design - **CRITICAL: Review these values carefully!**
+        const levelDesign = [
+            // Platforms (x, y, width, height, type)
+            // Floor
+            { x: 0, y: 550, width: 1000, height: 50, type: 'floor' },
+            // Platforms
+            { x: 200, y: 450, width: 150, height: 32, type: 'platform' },
+            { x: 400, y: 380, width: 150, height: 32, type: 'platform' },
+            { x: 600, y: 320, width: 150, height: 32, type: 'platform' },
+            { x: 800, y: 380, width: 150, height: 32, type: 'platform' },
+            { x: 1000, y: 450, width: 150, height: 32, type: 'platform' },
+            { x: 1200, y: 550, width: 800, height: 50, type: 'floor' },
+            // More platforms
+            { x: 1300, y: 450, width: 150, height: 32, type: 'platform' },
+            { x: 1500, y: 380, width: 150, height: 32, type: 'platform' },
+            { x: 1700, y: 320, width: 150, height: 32, type: 'platform' },
+            { x: 1900, y: 380, width: 150, height: 32, type: 'platform' },
+            // Path to boss arena
+            { x: 2000, y: 450, width: 150, height: 32, type: 'platform' }, // Platform leading up
+            { x: 2150, y: 350, width: 200, height: 32, type: 'platform' }, // Elevated platform for arena
+            // Boss Arena Floor
+            { x: 2150, y: 550, width: 500, height: 50, type: 'floor' },
+             // End floor extended for boss arena
+            { x: 2500, y: 550, width: 500, height: 50, type: 'floor' }, // Extend floor further right
+            // Boss arena barrier - prevent boss from falling
+            { x: 2950, y: 550, width: 50, height: 50, type: 'floor' }, // Right barrier for boss arena
+            { x: 2150, y: 550, width: 50, height: 50, type: 'floor' } // Left barrier for boss arena - NEW
+        ];
+
+        // Enemy spawn points
+        const enemySpawns = [
+            { x: 300, y: 400, type: 'imp' },
+            { x: 500, y: 330, type: 'imp' },
+            { x: 700, y: 270, type: 'imp' },
+            { x: 900, y: 330, type: 'demon' },
+            { x: 1100, y: 400, type: 'imp' },
+            { x: 1400, y: 400, type: 'demon' },
+            { x: 1600, y: 330, type: 'imp' },
+            { x: 1800, y: 270, type: 'demon' },
+            { x: 2300, y: 450, type: 'cyberdemon' } // Cyberdemon boss spawn
+        ];
+
+        // Pickup spawn points
+        const pickupSpawns = [
+            { x: 350, y: 420, type: 'health' },
+            { x: 650, y: 290, type: 'ammo' },
+            { x: 1050, y: 420, type: 'health' },
+            { x: 1550, y: 350, type: 'ammo' },
+            { x: 1850, y: 290, type: 'health' },
+            // Pickups around boss arena
+            { x: 2200, y: 520, type: 'health' },
+            { x: 2350, y: 520, type: 'ammo' },
+            { x: 2500, y: 520, type: 'health' },
+            { x: 2650, y: 520, type: 'ammo' }
+        ];
+
+        // Camera
+        const camera = {
+            x: 0,
+            y: 0,
+            width: canvas.width,
+            height: canvas.height,
+            update: function() {
+                // Center camera on player with some lookahead in the direction they're facing
+                const targetX = player.x - canvas.width / 2 + (player.direction * 100);
+
+                // Smooth camera movement
+                this.x += (targetX - this.x) * 0.1;
+
+                // Keep camera within level bounds
+                this.x = Math.max(0, this.x);
+                this.x = Math.min(3000 - canvas.width, this.x); // Increased level bounds for boss area
+            }
+        };
+
+        // Input handling
+        const keys = {};
+
+        document.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key === 'Shift') { // Handle both Shift keys
+                keys['shift'] = true;
+            }
+
+            // Prevent spacebar from scrolling the page
+            if (e.key === ' ') {
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+            if (e.key === 'Shift') { // Handle both Shift keys
+                keys['shift'] = false;
+            }
+        });
+
+        // UI elements
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over');
+        const winScreen = document.getElementById('win-screen'); // Win screen element
+        const startButton = document.getElementById('start-button');
+        const restartButton = document.getElementById('restart-button');
+        const winRestartButton = document.getElementById('win-restart-button'); // Restart button on win screen
+        const healthDisplay = document.getElementById('health-display');
+        const ammoDisplay = document.getElementById('ammo-display');
+        const scoreDisplay = document.getElementById('score-display');
+        const controlDisclaimer = document.getElementById('control-disclaimer'); // Control disclaimer text
+
+        // Event listeners for UI buttons
+        startButton.addEventListener('click', startGame);
+        restartButton.addEventListener('click', restartGame);
+        winRestartButton.addEventListener('click', restartGame); // Use same restartGame for win restart
+
+        function startGame() {
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            winScreen.style.display = 'none'; // Hide win screen on game start
+            initGame();
+        }
+
+        function restartGame() {
+            gameOverScreen.style.display = 'none';
+            winScreen.style.display = 'none'; // Hide win screen on restart
+            initGame();
+        }
+
+        // Game initialization
+        function initGame() {
+            // Reset game state
+            gameRunning = true;
+            playerHealth = 100;
+            playerAmmo = 50;
+            score = 0;
+
+            // Reset player
+            player.x = 100,
+            player.y = 300,
+            player.velocityX = 0,
+            player.velocityY = 0,
+            player.isJumping = false,
+            player.direction = 1,
+            player.shootCooldown = 0,
+            player.invulnerable = 0,
+            player.color = '#008000', // Doom green
+            player.jumpCooldownTimer = 0; // Reset jump cooldown
+
+            // Clear arrays
+            bullets.length = 0;
+            enemies.length = 0;
+            platforms.length = 0;
+            pickups.length = 0;
+            fallingPickups.length = 0; // Clear falling pickups
+            clearInterval(ammoDropInterval); // Clear any existing ammo drop interval
+
+            // Load level
+            loadLevel();
+
+            // Update UI
+            updateUI();
+
+            // Start game loop
+            requestAnimationFrame(gameLoop);
+        }
+
+        function loadLevel() {
+            // Create platforms
+            platforms.length = 0; // Clear existing platforms before loading
+            levelDesign.forEach(platform => {
+                platforms.push({
+                    x: platform.x,
+                    y: platform.y,
+                    width: platform.width,
+                    height: platform.height,
+                    type: platform.type,
+                    color: platform.type === 'floor' ? '#8B0000' : '#606060'
+                });
+            });
+
+            // Spawn enemies
+            enemies.length = 0; // Clear existing enemies
+            enemySpawns.forEach(spawn => {
+                spawnEnemy(spawn.x, spawn.y, spawn.type);
+            });
+
+            // Spawn pickups
+            pickups.length = 0; // Clear existing pickups
+            pickupSpawns.forEach(spawn => {
+                spawnPickup(spawn.x, spawn.y, spawn.type);
+            });
+        }
+
+        function spawnEnemy(x, y, type) {
+            let enemyWidth, enemyHeight, enemyHealth, enemyDamage, enemyColor;
+
+            if (type === 'imp') {
+                enemyWidth = 32;
+                enemyHeight = 40;
+                enemyHealth = 20;
+                enemyDamage = 10;
+                enemyColor = '#8B4513';
+            } else if (type === 'demon') {
+                enemyWidth = 48;
+                enemyHeight = 48;
+                enemyHealth = 50;
+                enemyDamage = 20;
+                enemyColor = '#A52A2A';
+            } else if (type === 'cyberdemon') { // Cyberdemon stats
+                enemyWidth = 96;
+                enemyHeight = 96;
+                enemyHealth = 300; // High health for boss
+                enemyDamage = 30; // High damage for boss
+                enemyColor = '#4682B4'; // Steel Blue for Cyberdemon
+            }
+
+            const enemy = {
+                x: x,
+                y: y,
+                width: enemyWidth,
+                height: enemyHeight,
+                velocityX: 0,
+                velocityY: 0,
+                health: enemyHealth,
+                damage: enemyDamage,
+                type: type,
+                direction: -1,
+                state: 'patrol', // Default state, will be overridden for cyberdemon
+                patrolTimer: 0,
+                color: enemyColor,
+                aiState: 'strafeRight1', // Cyberdemon AI state machine
+                aiTimer: 0, // Timer for AI state duration
+                isJumping: false // Add isJumping for boss
+            };
+
+            if (type === 'cyberdemon') {
+                enemy.state = 'bossFight'; // Set boss fight state for cyberdemon
+            }
+
+            enemies.push(enemy);
+        }
+
+        function spawnPickup(x, y, type) {
+            const pickup = {
+                x: x,
+                y: y,
+                width: 24,
+                height: 24,
+                type: type,
+                color: type === 'health' ? '#00FF00' : '#FFFF00',
+                opacityTimer: 0 // Timer for opacity animation
+            };
+
+            pickups.push(pickup);
+        }
+
+        function shoot() {
+            if (playerAmmo <= 0 || player.shootCooldown > 0) return;
+
+            const bullet = {
+                x: player.x + (player.direction > 0 ? player.width : 0),
+                y: player.y + player.height / 3,
+                width: 16,
+                height: 8,
+                velocityX: BULLET_SPEED * player.direction,
+                damage: 10,
+                color: '#FF0000'
+            };
+
+            bullets.push(bullet);
+            playerAmmo--;
+            player.shootCooldown = 10;
+
+            // Update UI
+            updateUI();
+
+            if (playerAmmo <= 0) {
+                startAmmoDrop(); // Start dropping ammo if player runs out
+            }
+        }
+
+        // Function to start dropping ammo from the sky
+        function startAmmoDrop() {
+            if (ammoDropInterval) return; // Prevent starting multiple intervals
+
+            ammoDropInterval = setInterval(() => {
+                if (playerAmmo > 0) {
+                    clearInterval(ammoDropInterval); // Stop dropping if ammo is picked up
+                    ammoDropInterval = null;
+                    return;
+                }
+                dropAmmoFromSky();
+            }, 2000); // Drop ammo every 2 seconds
+        }
+
+        // Function to create and drop ammo from the sky
+        function dropAmmoFromSky() {
+            const x = Math.random() * canvas.width; // Random x position within canvas width
+            const y = -24; // Start above the canvas
+            const pickup = {
+                x: x,
+                y: y,
+                width: 24,
+                height: 24,
+                type: 'ammo',
+                color: '#FFFF00',
+                velocityY: 2, // Speed at which ammo falls
+                opacityTimer: 0
+            };
+            fallingPickups.push(pickup);
+        }
+
+
+        // Game over function
+        function gameOver() {
+            gameRunning = false;
+            gameOverScreen.style.display = 'flex';
+            clearInterval(ammoDropInterval); // Stop ammo drop on game over
+            ammoDropInterval = null;
+        }
+
+        // Game win function
+        function winGame() {
+            gameRunning = false;
+            winScreen.style.display = 'flex';
+            clearInterval(ammoDropInterval); // Stop ammo drop on game win
+            ammoDropInterval = null;
+        }
+
+        // Update UI display
+        function updateUI() {
+            healthDisplay.textContent = playerHealth;
+            ammoDisplay.textContent = playerAmmo;
+            scoreDisplay.textContent = score;
+        }
+
+        // Game update logic
+        function update() {
+            if (!gameRunning) return; // Pause update if game is not running
+
+            // Player input
+            player.velocityX = 0;
+
+            if (keys['a']) {
+                player.velocityX = -PLAYER_SPEED;
+                player.direction = -1;
+            }
+
+            if (keys['d']) {
+                player.velocityX = PLAYER_SPEED;
+                player.direction = 1;
+            }
+
+            if (keys[' '] && !player.isJumping && player.jumpCooldownTimer <= 0) { // Spacebar for jump and cooldown check
+                player.velocityY = JUMP_FORCE;
+                player.isJumping = true;
+                player.jumpCooldownTimer = 500; // Set cooldown after jump
+            }
+
+
+            if (keys['shift']) { // Shift for shoot
+                shoot();
+            }
+
+            // Apply gravity
+            player.velocityY += GRAVITY;
+
+            // Move player
+            player.x += player.velocityX;
+            player.y += player.velocityY;
+
+            // Collision detection with platforms - **REWRITTEN PLATFORM COLLISION LOGIC**
+            player.isJumping = true; // Assume jumping until grounded
+
+            for (const platform of platforms) {
+                const platformX = platform.x; // World position, no camera offset needed in logic
+                const platformY = platform.y;
+                const platformWidth = platform.width;
+                const platformHeight = platform.height;
+
+                // Check horizontal overlap
+                const overlapX = player.x + player.width > platformX && player.x < platformX + platformWidth;
+
+                // Check for landing on top of the platform
+                if (overlapX &&
+                    player.y + player.height > platformY &&
+                    player.y < platformY && // Important: Check if player is *above* the platform
+                    player.velocityY >= 0 // Only when falling or standing still vertically
+                ) {
+                    player.isJumping = false;
+                    player.velocityY = 0;
+                    player.y = platformY - player.height; // Position player exactly on top
+                    player.jumpCooldownTimer = 0; // Reset jump cooldown when grounded
+                } else if (overlapX &&
+                           player.y < platformY + platformHeight &&
+                           player.y + player.height > platformY &&
+                           player.velocityY < 0 ) { // Check for bumping head on platform from below during jump
+                    player.velocityY = 0; // Stop upward movement
+                    player.y = platformY + platformHeight; // Nudge player slightly below platform to prevent sticking
+                }
+            }
+
+
+            // Prevent player from going off screen (horizontal bounds)
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > 3000) player.x = 3000 - player.width; // Increased level bounds
+
+            // Game over if player falls off screen (vertical bounds)
+            if (player.y > canvas.height) {
+                gameOver();
+                return;
+            }
+
+            // Update bullets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                bullet.x += bullet.velocityX;
+
+                // Remove bullets that go off screen
+                if (bullet.x < 0 || bullet.x > 3000) { // Increased level bounds
+                    bullets.splice(i, 1);
+                    continue;
+                }
+
+                // Check for collision with enemies
+                for (let j = enemies.length - 1; j >= 0; j--) {
+                    const enemy = enemies[j];
+
+                    if (
+                        bullet.x + bullet.width > enemy.x &&
+                        bullet.x < enemy.x + enemy.width &&
+                        bullet.y + bullet.height > enemy.y &&
+                        bullet.y < enemy.y + enemy.height
+                    ) {
+                        enemy.health -= bullet.damage;
+
+                        // Remove bullet
+                        bullets.splice(i, 1);
+
+                        // Check if enemy is defeated
+                        if (enemy.health <= 0) {
+                            enemies.splice(j, 1);
+                            score += enemy.type === 'imp' ? 100 : 200;
+                            updateUI();
+
+                            // Chance to drop pickup (less likely for cyberdemon)
+                            if (enemy.type !== 'cyberdemon' && Math.random() < 0.3) {
+                                spawnPickup(
+                                    enemy.x + enemy.width / 2,
+                                    enemy.y + enemy.height / 2,
+                                    Math.random() < 0.5 ? 'health' : 'ammo'
+                                );
+                            }
+
+                            if (enemy.type === 'cyberdemon') {
+                                winGame(); // Player wins when Cyberdemon is defeated
+                            }
+                        }
+
+                        break;
+                    }
+                }
+            }
+
+            // Update enemies
+            enemies.forEach(enemy => {
+                // Enemy AI - different behavior based on type and state
+                if (enemy.type !== 'cyberdemon') { // Standard enemy AI
+                    if (Math.abs(player.x - enemy.x) < 500) {
+                        enemy.state = 'chase';
+                        enemy.direction = player.x < enemy.x ? -1 : 1;
+                        enemy.velocityX = enemy.direction * ENEMY_SPEED;
+                    } else {
+                        enemy.state = 'patrol';
+                        enemy.patrolTimer++;
+                        if (enemy.patrolTimer > 100) {
+                            enemy.direction *= -1;
+                            enemy.patrolTimer = 0;
+                        }
+                        enemy.velocityX = enemy.direction * (ENEMY_SPEED / 2);
+                    }
+                } else if (enemy.type === 'cyberdemon') { // Cyberdemon BOSS AI
+                    enemy.aiTimer++;
+                    const aiSpeed = ENEMY_SPEED * 1.2; // Slightly faster boss movement
+                    const jumpInterval = 60; // Adjust jump timing as needed
+
+                    switch (enemy.aiState) {
+                        case 'strafeRight1':
+                            enemy.velocityX = aiSpeed;
+                            if (enemy.aiTimer > 30) {
+                                enemy.aiState = 'strafeRight2';
+                                enemy.aiTimer = 0;
+                            }
+                            break;
+                        case 'strafeRight2':
+                            enemy.velocityX = aiSpeed;
+                            if (enemy.aiTimer > 30) {
+                                enemy.aiState = 'jumpRight';
+                                enemy.aiTimer = 0;
+                            }
+                            break;
+                        case 'jumpRight':
+                            if (!enemy.isJumping) {
+                                enemy.velocityY = JUMP_FORCE;
+                                enemy.isJumping = true;
+                            }
+                            if (enemy.aiTimer > jumpInterval) {
+                                enemy.aiState = 'strafeLeft1';
+                                enemy.aiTimer = 0;
+                                enemy.isJumping = false;
+                            }
+                            enemy.velocityX = aiSpeed; // Continue moving right during jump
+                            break;
+                        case 'strafeLeft1':
+                            enemy.velocityX = -aiSpeed;
+                            if (enemy.aiTimer > 30) {
+                                enemy.aiState = 'jumpLeft';
+                                enemy.aiTimer = 0;
+                            }
+                            break;
+                        case 'jumpLeft':
+                            if (!enemy.isJumping) {
+                                enemy.velocityY = JUMP_FORCE;
+                                enemy.isJumping = true;
+                            }
+                            if (enemy.aiTimer > jumpInterval) {
+                                enemy.aiState = 'strafeLeft2';
+                                enemy.aiTimer = 0;
+                                enemy.isJumping = false;
+                            }
+                            enemy.velocityX = -aiSpeed; // Continue moving left during jump
+                            break;
+                         case 'strafeLeft2':
+                            enemy.velocityX = -aiSpeed;
+                            if (enemy.aiTimer > 30) {
+                                enemy.aiState = 'jumpRightAgain';
+                                enemy.aiTimer = 0;
+                            }
+                            break;
+                        case 'jumpRightAgain':
+                            if (!enemy.isJumping) {
+                                enemy.velocityY = JUMP_FORCE;
+                                enemy.isJumping = true;
+                            }
+                            if (enemy.aiTimer > jumpInterval) {
+                                enemy.aiState = 'strafeRight3';
+                                enemy.aiTimer = 0;
+                                enemy.isJumping = false;
+                            }
+                            enemy.velocityX = aiSpeed;
+                            break;
+                        case 'strafeRight3':
+                            enemy.velocityX = aiSpeed;
+                            if (enemy.aiTimer > 90) { // Longer strafe right at end
+                                enemy.aiState = 'strafeRight1'; // Loop back to start
+                                enemy.aiTimer = 0;
+                            }
+                            break;
+                    }
+                }
+
+
+                // Apply gravity
+                enemy.velocityY += GRAVITY;
+
+                // Move enemy
+                enemy.x += enemy.velocityX;
+                enemy.y += enemy.velocityY;
+
+                // Collision detection with platforms - **Enemy Collision Check Corrected**
+                enemy.isJumping = enemy.velocityY > 0; // Update isJumping based on velocity
+                for (const platform of platforms) {
+                    const platformX = platform.x;
+                    const platformY = platform.y;
+                    const platformWidth = platform.width;
+
+                    if (
+                        enemy.x + enemy.width > platformX &&
+                        enemy.x < platformX + platformWidth &&
+                        enemy.y + enemy.height >= platformY &&
+                        enemy.y <= platformY &&
+                        enemy.velocityY >= 0
+                    ) {
+                        enemy.velocityY = 0;
+                        enemy.y = platformY - enemy.height;
+                        enemy.isJumping = false; // Grounded on platform
+                    }
+                }
+
+                // Keep boss within arena bounds - prevent falling into pit
+                if (enemy.type === 'cyberdemon') {
+                    enemy.x = Math.max(2150, Math.min(enemy.x, 2950 - enemy.width)); // Arena boundaries
+                }
+
+
+                // Check for collision with player
+                if (
+                    player.invulnerable <= 0 &&
+                    player.x + player.width > enemy.x &&
+                    player.x < enemy.x + enemy.width &&
+                    player.y + player.height > enemy.y &&
+                    player.y < enemy.y + enemy.height
+                ) {
+                    playerHealth -= enemy.damage;
+                    player.invulnerable = 60; // 1 second of invulnerability
+
+                    // Knockback
+                    player.velocityX = (player.x < enemy.x ? -1 : 1) * 10;
+                    player.velocityY = -5;
+
+                    updateUI();
+
+                    // Check if player is defeated
+                    if (playerHealth <= 0) {
+                        gameOver();
+                    }
+                }
+            });
+
+            // Update pickups
+            for (let i = pickups.length - 1; i >= 0; i--) {
+                const pickup = pickups[i];
+                pickup.opacityTimer += 0.02; // Increment timer for opacity animation
+
+                // Check for collision with player
+                if (
+                    player.x + player.width > pickup.x &&
+                    player.x < pickup.x + pickup.width &&
+                    player.y + player.height > pickup.y &&
+                    player.y < pickup.y + pickup.height
+                ) {
+                    // Apply pickup effect
+                    if (pickup.type === 'health') {
+                        playerHealth = Math.min(playerHealth + 25, 100);
+                    } else if (pickup.type === 'ammo') {
+                        playerAmmo += 15;
+                        clearInterval(ammoDropInterval); // Stop dropping ammo when picked up
+                        ammoDropInterval = null;
+                    }
+
+                    // Remove pickup
+                    pickups.splice(i, 1);
+
+                    // Update UI
+                    updateUI();
+                }
+            }
+
+            // Update falling pickups
+            for (let i = fallingPickups.length - 1; i >= 0; i--) {
+                const pickup = fallingPickups[i];
+                pickup.opacityTimer += 0.02;
+                pickup.y += pickup.velocityY; // Make the pickup fall
+
+                // Check for collision with player
+                if (
+                    player.x + player.width > pickup.x &&
+                    player.x < pickup.x + pickup.width &&
+                    player.y + player.height > pickup.y &&
+                    player.y < pickup.y + pickup.height
+                ) {
+                    if (pickup.type === 'ammo') {
+                        playerAmmo += 15;
+                        clearInterval(ammoDropInterval); // Stop dropping ammo when picked up
+                        ammoDropInterval = null;
+                    }
+                    fallingPickups.splice(i, 1); // Remove the falling pickup
+                    updateUI();
+                }
+
+                // Remove falling pickups that go off screen
+                if (pickup.y > canvas.height) {
+                    fallingPickups.splice(i, 1);
+                }
+            }
+
+
+            // Update cooldowns
+            if (player.shootCooldown > 0) player.shootCooldown--;
+            if (player.invulnerable > 0) player.invulnerable--;
+            if (player.jumpCooldownTimer > 0) player.jumpCooldownTimer -= (1000/60); // Decrement jump cooldown in milliseconds per frame (assuming ~60fps)
+
+            // Update camera
+            camera.update();
+        }
+
+        // Rendering
+        function render() {
+            if (!gameRunning) return; // Pause rendering if game is not running
+
+            // Clear canvas
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw background (simple 8-bit Doom-like)
+            drawBackground();
+
+            // Draw platforms
+            platforms.forEach(platform => {
+                ctx.fillStyle = platform.color;
+                // **Correct Rendering - Using camera offset**
+                ctx.fillRect(
+                    platform.x - camera.x,
+                    platform.y,
+                    platform.width,
+                    platform.height
+                );
+
+                // Add texture to platforms
+                if (platform.type === 'floor') {
+                    drawFloorTexture(
+                        platform.x - camera.x,
+                        platform.y,
+                        platform.width,
+                        platform.height
+                    );
+                } else {
+                    drawPlatformTexture(
+                        platform.x - camera.x,
+                        platform.y,
+                        platform.width,
+                        platform.height
+                    );
+                }
+            });
+
+            // Draw pickups
+            pickups.forEach(pickup => {
+                const opacity = 0.7 + 0.3 * Math.sin(pickup.opacityTimer); // Opacity oscillates 0.7 to 1.0
+                ctx.globalAlpha = opacity; // Set global opacity
+                ctx.fillStyle = pickup.color;
+                ctx.fillRect(
+                    pickup.x - camera.x,
+                    pickup.y,
+                    pickup.width,
+                    pickup.height
+                );
+                ctx.globalAlpha = 1; // Reset global opacity
+
+                // Draw icon inside pickup
+                ctx.fillStyle = '#000000';
+                if (pickup.type === 'health') {
+                    // Draw a plus sign
+                    ctx.fillRect(pickup.x - camera.x + 10, pickup.y + 5, 4, 14);
+                    ctx.fillRect(pickup.x - camera.x + 5, pickup.y + 10, 14, 4);
+                } else {
+                    // Draw a bullet
+                    ctx.fillRect(pickup.x - camera.x + 8, pickup.y + 8, 8, 8);
+                }
+            });
+
+             // Draw falling pickups
+            fallingPickups.forEach(pickup => {
+                const opacity = 0.7 + 0.3 * Math.sin(pickup.opacityTimer);
+                ctx.globalAlpha = opacity;
+                ctx.fillStyle = pickup.color;
+                ctx.fillRect(
+                    pickup.x - camera.x,
+                    pickup.y,
+                    pickup.width,
+                    pickup.height
+                );
+                ctx.globalAlpha = 1;
+
+                ctx.fillStyle = '#000000';
+                if (pickup.type === 'ammo') {
+                    ctx.fillRect(pickup.x - camera.x + 8, pickup.y + 8, 8, 8);
+                }
+            });
+
+            // Draw bullets
+            bullets.forEach(bullet => {
+                ctx.fillStyle = bullet.color;
+                ctx.fillRect(
+                    bullet.x - camera.x,
+                    bullet.y,
+                    bullet.width,
+                    bullet.height
+                );
+            });
+
+            // Draw enemies
+            enemies.forEach(enemy => {
+                ctx.fillStyle = enemy.color;
+
+                // Flash if hit
+                if (enemy.health < (enemy.type === 'imp' ? 20 : 50) && Math.floor(Date.now() / 100) % 2 === 0) {
+                    ctx.fillStyle = '#FFFFFF';
+                }
+                if (enemy.health < (enemy.type === 'cyberdemon' ? 300 : 50) && Math.floor(Date.now() / 100) % 2 === 0 && enemy.type === 'cyberdemon') {
+                    ctx.fillStyle = '#FFFFFF'; // Flash white if cyberdemon is hit
+                }
+
+
+                ctx.fillRect(
+                    enemy.x - camera.x,
+                    enemy.y,
+                    enemy.width,
+                    enemy.height
+                );
+
+                // Add enemy features
+                drawEnemyFeatures(enemy);
+
+                // Draw health bar
+                let maxHealth;
+                if (enemy.type === 'imp') maxHealth = 20;
+                else if (enemy.type === 'demon') maxHealth = 50;
+                else if (enemy.type === 'cyberdemon') maxHealth = 300;
+
+                const healthPercent = enemy.health / maxHealth;
+
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(enemy.x - camera.x, enemy.y - 10, enemy.width, 5);
+
+                ctx.fillStyle = '#FF0000';
+                ctx.fillRect(
+                    enemy.x - camera.x + 1,
+                    enemy.y - 9,
+                    (enemy.width - 2) * healthPercent,
+                    3
+                );
+            });
+
+            // Draw player
+            ctx.fillStyle = player.invulnerable > 0 && Math.floor(Date.now() / 100) % 2 === 0
+                ? '#FFFFFF'
+                : player.color;
+            ctx.fillRect(
+                player.x - camera.x,
+                player.y,
+                player.width,
+                player.height
+            );
+
+
+            // Add player features
+            drawPlayerFeatures();
+        }
+
+        function drawBackground() {
+            // Simple 8-bit Doom-like background
+
+            // Draw sky gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height / 2);
+            gradient.addColorStop(0, '#000000');
+            gradient.addColorStop(1, '#8B0000');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
+
+            // Draw distant mountains
+            ctx.fillStyle = '#4B0082';
+
+            // First mountain range
+            ctx.beginPath();
+            ctx.moveTo(0 - (camera.x * 0.1) % 800, canvas.height / 2);
+
+            for (let x = 0; x < canvas.width + 800; x += 200) {
+                ctx.lineTo(x - (camera.x * 0.1) % 800, canvas.height / 2 - 50 - Math.sin(x / 200) * 30);
+            }
+
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.fill();
+
+            // Second mountain range
+            ctx.fillStyle = '#800000';
+            ctx.beginPath();
+            ctx.moveTo(0 - (camera.x * 0.2) % 600, canvas.height / 2);
+
+            for (let x = 0; x < canvas.width + 600; x += 150) {
+                ctx.lineTo(x - (camera.x * 0.2) % 600, canvas.height / 2 - 30 - Math.sin(x / 150) * 20);
+            }
+
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.fill();
+        }
+
+        function drawFloorTexture(x, y, width, height) {
+            ctx.fillStyle = '#400000';
+
+            // Draw a pattern of small squares
+            for (let i = 0; i < width; i += 16) {
+                for (let j = 0; j < height; j += 16) {
+                    if ((Math.floor(i / 16) + Math.floor(j / 16)) % 2 === 0) {
+                        ctx.fillRect(x + i, y + j, 16, 16);
+                    }
+                }
+            }
+        }
+
+        function drawPlatformTexture(x, y, width, height) {
+            ctx.fillStyle = '#303030';
+
+            // Draw a simple brick pattern
+            for (let i = 0; i < width; i += 16) {
+                for (let j = 0; j < height; j += 8) {
+                    if ((Math.floor(i / 16) + Math.floor(j / 8)) % 2 === 0) {
+                        ctx.fillRect(x + i, y + j, 16, 8);
+                    }
+                }
+            }
+        }
+
+        function drawPlayerFeatures() {
+            // Add player face/features (8-bit Doom Guy inspired)
+            const playerX = player.x - camera.x;
+            const playerY = player.y;
+            const direction = player.direction;
+
+            // Base Green Body
+            ctx.fillStyle = player.invulnerable > 0 && Math.floor(Date.now() / 100) % 2 === 0 ? '#FFFFFF' : '#008000';
+            ctx.fillRect(playerX, playerY, player.width, player.height); // Normal
+
+
+            // Yellow Visor/Mask
+            ctx.fillStyle = '#FFFF00';
+            let visorX = playerX + (direction > 0 ? 8 : 0); // Adjust visor position based on direction
+            let visorY = playerY + 8;
+            ctx.fillRect(visorX, visorY, 24, 12);
+
+            // Black Visor Line
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(visorX + 4, visorY + 6, 16, 2); // Horizontal line
+
+            // Shoulder Pads (simple)
+            ctx.fillStyle = '#696969'; // Dark Gray
+            ctx.fillRect(playerX - 2, playerY + 2, 4, 10); // Left shoulder
+            ctx.fillRect(playerX + player.width - 2, playerY + 2, 4, 10); // Right shoulder
+
+            // Chest Plate (very basic)
+            ctx.fillStyle = '#808080'; // Gray
+            ctx.fillRect(playerX + 4, playerY + 14, 24, 10);
+
+
+            // Gun (remains similar, adjust position slightly)
+            ctx.fillStyle = '#808080';
+            ctx.fillRect(
+                playerX + (direction > 0 ? player.width - 4 : -12),
+                playerY + player.height / 2,
+                16,
+                6
+            );
+        }
+
+
+        function drawEnemyFeatures(enemy) {
+            // Add enemy features based on type
+            if (enemy.type === 'imp') {
+                // Imp features
+                const faceX = enemy.x - camera.x + (enemy.direction > 0 ? 4 : 4);
+                const faceY = enemy.y + 8;
+
+                // Eyes
+                ctx.fillStyle = '#FFFF00';
+                ctx.fillRect(faceX + 4, faceY, 6, 6);
+                ctx.fillRect(faceX + 18, faceY, 6, 6);
+
+                // Mouth
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(faceX + 8, faceY + 12, 12, 4);
+            } else if (enemy.type === 'demon') {
+                // Demon features
+                const faceX = enemy.x - camera.x + (enemy.direction > 0 ? 8 : 8); // Centered face
+                const faceY = enemy.y + 8;
+
+                // Head shape
+                ctx.fillStyle = '#A0522D'; // Brownish color for demon head
+                ctx.fillRect(faceX, faceY, 32, 24);
+
+                // Snout
+                ctx.fillStyle = '#8B4513'; // Darker brown for snout
+                ctx.fillRect(faceX + 20, faceY + 12, 12, 8);
+
+                // Eyes - Red and angry
+                ctx.fillStyle = '#FF0000';
+                ctx.fillRect(faceX + 4, faceY + 4, 8, 4);
+                ctx.fillRect(faceX + 20, faceY + 4, 8, 4);
+
+                // Horns - Simple horns
+                ctx.fillStyle = '#696969'; // Dark gray for horns
+                ctx.fillRect(faceX + 4, faceY - 4, 4, 8);
+                ctx.fillRect(faceX + 24, faceY - 4, 4, 8);
+            } else if (enemy.type === 'cyberdemon') {
+                // Cyberdemon features - Robot Goat Skull
+                const bodyX = enemy.x - camera.x;
+                const bodyY = enemy.y;
+
+                // Robot Body - Dark Gray Base
+                ctx.fillStyle = '#585858'; // DimGray
+                ctx.fillRect(bodyX, bodyY, enemy.width, enemy.height);
+
+                // Goat Skull Face - Bone Color
+                ctx.fillStyle = '#F5F5DC'; // Beige
+                ctx.fillRect(bodyX + enemy.width / 4, bodyY + 10, enemy.width / 2, enemy.height / 2);
+
+                // Horns - Dark Brown
+                ctx.fillStyle = '#8B4513'; // SaddleBrown
+                ctx.fillRect(bodyX + enemy.width / 4 - 5, bodyY + 5, 5, 20); // Left Horn
+                ctx.fillRect(bodyX + 3 * enemy.width / 4 , bodyY + 5, 5, 20); // Right Horn
+
+                // Eye sockets - Black
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(bodyX + enemy.width / 4 + 10, bodyY + 20, 10, 8); // Left Eye Socket
+                ctx.fillRect(bodyX + enemy.width / 2, bodyY + 20, 10, 8); // Right Eye Socket
+
+                // Cannon Arm - Metallic Gray
+                ctx.fillStyle = '#A9A9A9'; // DarkGray
+                ctx.fillRect(bodyX - 20, bodyY + enemy.height / 4, 20, 25); // Cannon on left
+
+            }
+        }
+
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start the game when the page loads (optional, can wait for button click)
+        // initGame(); // Removed to wait for start button
+    </script>
 </body>
 </html>
