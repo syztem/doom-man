@@ -25,7 +25,7 @@
         }
 
         #game-canvas {
-            border: 4px solid #8B0000;
+            border: 4px solid brown; /* Changed border color to brown */
             image-rendering: pixelated;
             image-rendering: crisp-edges;
         }
@@ -211,6 +211,8 @@
         let playerAmmo = 50;
         let score = 0;
         let ammoDropInterval; // Variable to hold the ammo drop interval
+        let bossExploding = false; // Flag for boss explosion animation
+        let explosionPixels = []; // Array to hold explosion pixels
 
         // Game objects
         const player = {
@@ -396,6 +398,8 @@
             playerHealth = 100;
             playerAmmo = 50;
             score = 0;
+            bossExploding = false; // Reset boss explosion flag
+            explosionPixels = []; // Clear explosion pixels
 
             // Reset player
             player.x = 100,
@@ -600,6 +604,10 @@
         // Game update logic
         function update() {
             if (!gameRunning) return; // Pause update if game is not running
+            if (bossExploding) { // Update explosion pixels if boss is exploding
+                updateExplosion();
+                return; // Skip normal updates during explosion
+            }
 
             // Player input
             player.velocityX = 0;
@@ -702,22 +710,25 @@
 
                         // Check if enemy is defeated
                         if (enemy.health <= 0) {
-                            enemies.splice(j, 1);
-                            score += enemy.type === 'imp' ? 100 : 200;
-                            updateUI();
-
-                            // Chance to drop pickup (less likely for cyberdemon)
-                            if (enemy.type !== 'cyberdemon' && Math.random() < 0.3) {
-                                spawnPickup(
-                                    enemy.x + enemy.width / 2,
-                                    enemy.y + enemy.height / 2,
-                                    Math.random() < 0.5 ? 'health' : 'ammo'
-                                );
-                            }
-
                             if (enemy.type === 'cyberdemon') {
-                                winGame(); // Player wins when Cyberdemon is defeated
+                                startBossExplosion(enemy); // Start explosion for cyberdemon
+                                enemies.splice(j, 1); // Remove enemy after explosion starts
+                            } else {
+                                enemies.splice(j, 1);
+                                score += enemy.type === 'imp' ? 100 : 200;
+                                updateUI();
+
+                                // Chance to drop pickup (less likely for cyberdemon)
+                                if (enemy.type !== 'cyberdemon' && Math.random() < 0.3) {
+                                    spawnPickup(
+                                        enemy.x + enemy.width / 2,
+                                        enemy.y + enemy.height / 2,
+                                        Math.random() < 0.5 ? 'health' : 'ammo'
+                                    );
+                                }
                             }
+
+
                         }
 
                         break;
@@ -744,8 +755,9 @@
                     }
                 } else if (enemy.type === 'cyberdemon') { // Cyberdemon BOSS AI
                     enemy.aiTimer++;
-                    const aiSpeed = ENEMY_SPEED * 1.2; // Slightly faster boss movement
+                    const aiSpeed = ENEMY_SPEED * 0.75; // Slowed down boss speed by 25%
                     const jumpInterval = 60; // Adjust jump timing as needed
+                    const bossJumpForce = JUMP_FORCE * 0.75; // Reduced jump height by 25%
 
                     switch (enemy.aiState) {
                         case 'strafeRight1':
@@ -764,7 +776,7 @@
                             break;
                         case 'jumpRight':
                             if (!enemy.isJumping) {
-                                enemy.velocityY = JUMP_FORCE;
+                                enemy.velocityY = bossJumpForce;
                                 enemy.isJumping = true;
                             }
                             if (enemy.aiTimer > jumpInterval) {
@@ -783,7 +795,7 @@
                             break;
                         case 'jumpLeft':
                             if (!enemy.isJumping) {
-                                enemy.velocityY = JUMP_FORCE;
+                                enemy.velocityY = bossJumpForce;
                                 enemy.isJumping = true;
                             }
                             if (enemy.aiTimer > jumpInterval) {
@@ -802,7 +814,7 @@
                             break;
                         case 'jumpRightAgain':
                             if (!enemy.isJumping) {
-                                enemy.velocityY = JUMP_FORCE;
+                                enemy.velocityY = bossJumpForce;
                                 enemy.isJumping = true;
                             }
                             if (enemy.aiTimer > jumpInterval) {
@@ -947,6 +959,45 @@
             camera.update();
         }
 
+        function startBossExplosion(enemy) {
+            bossExploding = true;
+            const pixelSize = 6; // Size of each pixel in explosion
+            const numberOfPixels = (enemy.width / pixelSize) * (enemy.height / pixelSize);
+
+            for (let x = 0; x < enemy.width; x += pixelSize) {
+                for (let y = 0; y < enemy.height; y += pixelSize) {
+                    explosionPixels.push({
+                        x: enemy.x + x,
+                        y: enemy.y + y,
+                        size: pixelSize,
+                        color: enemy.color,
+                        velocityX: (Math.random() - 0.5) * 10, // Random horizontal velocity
+                        velocityY: (Math.random() - 0.5) * 10, // Random vertical velocity
+                        alpha: 1 // Initial opacity
+                    });
+                }
+            }
+        }
+
+        function updateExplosion() {
+            for (let i = explosionPixels.length - 1; i >= 0; i--) {
+                const pixel = explosionPixels[i];
+                pixel.x += pixel.velocityX;
+                pixel.y += pixel.velocityY;
+                pixel.alpha -= 0.02; // Fade out speed
+
+                if (pixel.alpha <= 0) {
+                    explosionPixels.splice(i, 1); // Remove faded pixel
+                }
+            }
+
+            if (explosionPixels.length === 0) {
+                bossExploding = false;
+                winGame(); // Trigger win game after explosion finishes
+            }
+        }
+
+
         // Rendering
         function render() {
             if (!gameRunning) return; // Pause rendering if game is not running
@@ -1085,20 +1136,35 @@
                 );
             });
 
-            // Draw player
-            ctx.fillStyle = player.invulnerable > 0 && Math.floor(Date.now() / 100) % 2 === 0
-                ? '#FFFFFF'
-                : player.color;
-            ctx.fillRect(
-                player.x - camera.x,
-                player.y,
-                player.width,
-                player.height
-            );
+            // Draw boss explosion
+            if (bossExploding) {
+                explosionPixels.forEach(pixel => {
+                    ctx.fillStyle = pixel.color;
+                    ctx.globalAlpha = pixel.alpha;
+                    ctx.fillRect(
+                        pixel.x - camera.x,
+                        pixel.y,
+                        pixel.size,
+                        pixel.size
+                    );
+                    ctx.globalAlpha = 1; // Reset alpha after drawing pixel
+                });
+            } else {
+                // Draw player only if boss is not exploding (boss explosion takes priority)
+                ctx.fillStyle = player.invulnerable > 0 && Math.floor(Date.now() / 100) % 2 === 0
+                    ? '#FFFFFF'
+                    : player.color;
+                ctx.fillRect(
+                    player.x - camera.x,
+                    player.y,
+                    player.width,
+                    player.height
+                );
 
 
-            // Add player features
-            drawPlayerFeatures();
+                // Add player features
+                drawPlayerFeatures();
+            }
         }
 
         function drawBackground() {
