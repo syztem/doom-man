@@ -6,7 +6,7 @@
     <title>DoomMan - 8-bit Doom Sidescroller</title>
     <style>
         body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #000; overflow: hidden; font-family: 'Courier New', monospace; }
-        #game-container { position: relative; width: 800px; height: 600px; display: flex; justify-content: center; align-items: center; }
+        #game-container { position: relative; width: 800px; height: 600px; }
         #game-canvas { border: 4px solid brown; image-rendering: pixelated; image-rendering: crisp-edges; }
         #start-screen, #game-over, #win-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: #000; color: #8B0000; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; }
         #start-screen h1 { font-size: 48px; margin-bottom: 20px; text-shadow: 2px 2px 0 #FF0000; }
@@ -85,11 +85,12 @@
             { x: 1900, y: 380, width: 150, height: 32, type: 'platform' },
             { x: 2000, y: 450, width: 150, height: 32, type: 'platform' },
             { x: 2150, y: 350, width: 200, height: 32, type: 'platform' },
-            { x: 2150, y: 550, width: 500, height: 50, type: 'floor' },
-            { x: 2500, y: 550, width: 500, height: 50, type: 'floor' },
-            { x: 2950, y: 550, width: 50, height: 50, type: 'floor' },
-            { x: 2150, y: 550, width: 50, height: 50, type: 'floor' },
-            { x: 3500, y: 0, width: 32, height: 600, type: 'wall' }
+            { x: 2150, y: 550, width: 2850, height: 50, type: 'floor' }, 
+            { x: 5000, y: 0, width: 32, height: 600, type: 'wall' }, 
+            { x: 3700, y: 450, width: 200, height: 32, type: 'platform' },
+            { x: 4000, y: 380, width: 200, height: 32, type: 'platform' },
+            { x: 4300, y: 450, width: 200, height: 32, type: 'platform' },
+            { x: 4600, y: 380, width: 200, height: 32, type: 'platform' }
         ];
         const enemySpawns = [
             { x: 300, y: 400, type: 'imp' },
@@ -105,7 +106,11 @@
             { x: 2750, y: 480, type: 'imp' },
             { x: 2900, y: 480, type: 'demon' },
             { x: 3050, y: 480, type: 'imp' },
-            { x: 3200, y: 480, type: 'demon' }
+            { x: 3200, y: 480, type: 'demon' },
+            { x: 3800, y: 400, type: 'imp' },
+            { x: 4100, y: 330, type: 'demon' },
+            { x: 4400, y: 400, type: 'imp' },
+            { x: 4700, y: 330, type: 'demon' }
         ];
         const pickupSpawns = [
             { x: 350, y: 420, type: 'health' },
@@ -116,14 +121,18 @@
             { x: 2200, y: 520, type: 'health' },
             { x: 2350, y: 520, type: 'ammo' },
             { x: 2500, y: 520, type: 'health' },
-            { x: 2650, y: 520, type: 'ammo' }
+            { x: 2650, y: 520, type: 'ammo' },
+            { x: 3900, y: 420, type: 'ammo' },
+            { x: 4200, y: 350, type: 'health' },
+            { x: 4500, y: 420, type: 'ammo' },
+            { x: 4800, y: 350, type: 'health' }
         ];
         const camera = {
             x: 0, y: 0, width: canvas.width, height: canvas.height, update: function () {
                 const targetX = player.x - canvas.width / 2 + (player.direction * 100);
                 this.x += (targetX - this.x) * 0.1;
                 this.x = Math.max(0, this.x);
-                this.x = Math.min(3500 - canvas.width, this.x);
+                this.x = Math.min(5000 - canvas.width, this.x); 
             }
         };
         const keys = {};
@@ -299,12 +308,12 @@
                 }
             }
             if (player.x < 0) player.x = 0;
-            if (player.x + player.width > 3500) player.x = 3500 - player.width;
+            if (player.x + player.width > 5000) player.x = 5000 - player.width; 
             if (player.y > canvas.height) { gameOver(); return; }
             for (let i = bullets.length - 1; i >= 0; i--) {
                 const bullet = bullets[i];
                 bullet.x += bullet.velocityX;
-                if (bullet.x < 0 || bullet.x > 3500) { bullets.splice(i, 1); continue; }
+                if (bullet.x < 0 || bullet.x > 5000) { bullets.splice(i, 1); continue; }
                 for (let j = enemies.length - 1; j >= 0; j--) {
                     const enemy = enemies[j];
                     if (bullet.x + bullet.width > enemy.x && bullet.x < enemy.x + enemy.width && bullet.y + bullet.height > enemy.y && bullet.y < enemy.y + enemy.height) {
